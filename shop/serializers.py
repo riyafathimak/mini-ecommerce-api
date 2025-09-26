@@ -6,21 +6,28 @@ from django.contrib.auth import get_user_model
 
 
 
+
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ['id','name','price','stock','description']
+        fields = ['id', 'name', 'price', 'stock', 'description']
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_detail = ProductSerializer(source='product', read_only=True)
+    subtotal = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ['id','order','product','product_detail','quantity','price']
-        read_only_fields = ['price','product_detail']
+        fields = ['id', 'product', 'product_detail', 'quantity', 'price', 'subtotal']
+
+       
+
+    def get_subtotal(self, obj):
+        return obj.price * obj.quantity
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     user = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
@@ -74,3 +81,9 @@ class AddItemSerializer(serializers.Serializer):
             product.save()
 
         return item
+    class ProductOrderSummarySerializer(serializers.Serializer):
+     product_id = serializers.IntegerField()
+     product_name = serializers.CharField()
+     total_quantity = serializers.IntegerField()
+     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+

@@ -16,6 +16,9 @@ from rest_framework import generics, viewsets, status
 from .models import Product, Order, OrderItem
 from django.contrib.auth.models import User
 from rest_framework import serializers
+from rest_framework.views import APIView
+from django.db.models import Sum, F
+
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -75,7 +78,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        created_items = []
+        created_items = self.new_method()
         for item_data in items_data:
             serializer = AddItemSerializer(data=item_data, context={'request': request})
             serializer.is_valid(raise_exception=True)
@@ -86,6 +89,10 @@ class OrderViewSet(viewsets.ModelViewSet):
                 return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(created_items, status=status.HTTP_201_CREATED)
+
+    def new_method(self):
+        created_items = []
+        return created_items
 
     @action(detail=True, methods=['post'], url_path='change-status')
     def change_status(self, request, pk=None):
@@ -117,3 +124,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+   
+class TotalOrderSummaryView(APIView):
+    def get(self, request):
+        summary = (
+            OrderItem.objects
+            .values('product', 'product__name')
+            .annotate(
+                total_quantity=Sum('quantity'),
+                total_amount=Sum(F('quantity') * F('price'))
+            )
+        )
+        return Response(summary)
