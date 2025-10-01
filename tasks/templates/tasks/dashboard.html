@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Employee Task Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<!-- Header -->
+<header class="bg-blue-600 text-white p-4 flex justify-between items-center">
+  <h1 class="text-2xl font-bold">Employee Task Management</h1>
+  <div class="flex items-center space-x-4">
+    <p>Welcome, {{ request.user.username }}</p>
+    <a href="{% url 'employee_list' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">View Employees</a>
+    <a href="{% url 'task_add' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow">+ Add Task</a>
+  </div>
+</header>
+
+<!-- Filter Form -->
+<form method="get" class="mb-4 flex space-x-2 p-6">
+  <select name="status" class="border px-2">
+    <option value="" {% if request.GET.status == "" %}selected{% endif %}>All Status</option>
+    <option value="todo" {% if request.GET.status == "todo" %}selected{% endif %}>To Do</option>
+    <option value="in_progress" {% if request.GET.status == "in_progress" %}selected{% endif %}>In Progress</option>
+    <option value="completed" {% if request.GET.status == "completed" %}selected{% endif %}>Completed</option>
+  </select>
+  <input type="text" name="employee" placeholder="Search by employee" class="border px-2" value="{{ request.GET.employee|default:'' }}">
+  <button class="bg-blue-500 text-white px-3 py-1">Filter</button>
+</form>
+
+<!-- Task Board -->
+<main class="p-6 grid grid-cols-3 gap-4">
+  {% for column, column_name in status_list %}
+  <div class="bg-gray-200 rounded p-4 flex flex-col min-h-[300px]">
+    {% if column == "completed" %}
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="font-bold text-lg text-black-700">{{ column_name }}</h2>
+      <button onclick="openEmailModal()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm shadow">
+        Send Email
+      </button>
+    </div>
+    {% else %}
+    <h2 class="font-bold text-lg mb-4">{{ column_name }}</h2>
+    {% endif %}
+    
+    <div class="flex flex-col" id="{{ column }}-tasks">
+      {% for task in tasks %}
+        {% if task.status == column %}
+        <div class="bg-white p-3 rounded shadow mb-2 cursor-move task min-h-[50px]" data-id="{{ task.id }}">
+          <div class="flex justify-between items-start">
+            <h3 class="font-semibold">{{ task.title }}</h3>
+            <span class="text-xs text-gray-500">
+              {% if task.assigned_to.all %}
+                {% for emp in task.assigned_to.all %}
+                  {{ emp.user.username }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                Not Assigned
+              {% endif %}
+            </span>
+          </div>
+          <p class="text-sm text-gray-600 mt-1">{{ task.description }}</p>
+          <p class="text-xs mt-1">Due: {{ task.due_date|default:"Not set" }}</p>
+          <span class="px-2 py-1 text-white text-xs rounded mt-1
+            {% if task.priority == 'High' %} bg-red-500
+            {% elif task.priority == 'Medium' %} bg-yellow-500
+            {% else %} bg-green-500 {% endif %}">
+            {{ task.priority }}
+          </span>
+          
+          <!-- Comments -->
+          <div id="comments-{{ task.id }}" class="mt-2 border-t pt-1 max-h-[5rem] overflow-y-auto space-y-1">
+            {% for comment in task.comments.all %}
+            <div class="p-1 bg-gray-100 rounded text-xs">
+              <b>{{ comment.user.username }}</b>: {{ comment.content }}
+            </div>
+            {% empty %}
+            <div class="text-gray-400 text-xs">No comments yet.</div>
+            {% endfor %}
+          </div>
+          
+          <!-- Add Comment Form -->
+          <form class="comment-form mt-2" data-task-id="{{ task.id }}">
+            {% csrf_token %}
+            <textarea name="content" rows="2" placeholder="Add a comment" class="border w-full p-1"></textarea>
+            <button type="submit" class="bg-blue-500 text-white px-2 py-1 mt-1 rounded">Add Comment</button>
+          </form>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</main>
+
+<!-- Improved Email Modal with Checkboxes -->
+<div id="emailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+  <div class="bg-white p-6 rounded-xl w-96 shadow-lg max-h-[80vh] overflow-y-auto">
+    <h2 class="text-lg font-semibold mb-4">Send Email Notification</h2>
+    <form method="POST" action="{% url 'send_email' %}" id="emailForm">
+      {% csrf_token %}
+      <label class="block mb-2 text-sm font-medium">Select Employees</label>
+      
+      <!-- Select All Checkbox -->
+      <div class="mb-2 pb-2 border-b">
+        <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+          <input type="checkbox" id="selectAll" class="w-4 h-4">
+          <span class="font-semibold">Select All</span>
+        </label>
+      </div>
+      
+      <!-- Individual Employee Checkboxes -->
+      <div class="space-y-1 mb-4 max-h-64 overflow-y-auto">
+        {% for employee in employees %}
+        <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+          <input type="checkbox" name="employees" value="{{ employee.id }}" class="employee-checkbox w-4 h-4">
+          <span>{{ employee.user.username }} {% if employee.user.email %}({{ employee.user.email }}){% endif %}</span>
+        </label>
+        {% endfor %}
+      </div>
+      
+      <div id="emailError" class="text-red-500 text-sm mb-2 hidden">Please select at least one employee</div>
+      
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeEmailModal()" class="px-3 py-1 border rounded-lg hover:bg-gray-100">Cancel</button>
+        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg">Send</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- JS -->
+<script>
+// Drag and drop functionality
+['todo-tasks','in_progress-tasks','completed-tasks'].forEach(id => {
+    new Sortable(document.getElementById(id), {
+        group: 'tasks',
+        animation: 200,
+        ghostClass: 'opacity-50',
+        draggable: '.task',
+        onEnd: function(evt) {
+            const taskId = evt.item.dataset.id;
+            const newStatus = evt.to.id.replace('-tasks','');
+            fetch(`/tasks/update_status/${taskId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({status: newStatus})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(!data.success){
+                    alert('Failed to update status');
+                    evt.from.appendChild(evt.item);
+                }
+            });
+        }
+    });
+});
+
+// Email modal functions
+function openEmailModal() {
+  document.getElementById('emailModal').classList.remove('hidden');
+  document.getElementById('emailError').classList.add('hidden');
+}
+
+function closeEmailModal() {
+  document.getElementById('emailModal').classList.add('hidden');
+  document.getElementById('emailForm').reset();
+}
+
+// Select all functionality
+document.getElementById('selectAll').addEventListener('change', function() {
+  const checkboxes = document.querySelectorAll('.employee-checkbox');
+  checkboxes.forEach(cb => cb.checked = this.checked);
+});
+
+// Update "Select All" if individual boxes change
+document.querySelectorAll('.employee-checkbox').forEach(cb => {
+  cb.addEventListener('change', function() {
+    const allCheckboxes = document.querySelectorAll('.employee-checkbox');
+    const allChecked = Array.from(allCheckboxes).every(c => c.checked);
+    document.getElementById('selectAll').checked = allChecked;
+  });
+});
+
+// Form validation
+document.getElementById('emailForm').addEventListener('submit', function(e) {
+  const checkedBoxes = document.querySelectorAll('.employee-checkbox:checked');
+  if (checkedBoxes.length === 0) {
+    e.preventDefault();
+    document.getElementById('emailError').classList.remove('hidden');
+    return false;
+  }
+});
+
+// Add comment via AJAX
+document.querySelectorAll('.comment-form').forEach(form => {
+    form.addEventListener('submit', function(e){
+        e.preventDefault();
+        const taskId = this.dataset.taskId;
+        const textarea = this.querySelector('textarea');
+        const content = textarea.value.trim();
+        const csrfToken = this.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        if(!content) return alert('Comment cannot be empty');
+        
+        fetch("{% url 'add_comment' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken
+            },
+            body: new URLSearchParams({
+                'task_id': taskId,
+                'content': content
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.error){
+                alert(data.error);
+            } else {
+                const commentBox = document.getElementById(`comments-${taskId}`);
+                const div = document.createElement('div');
+                div.classList.add('bg-gray-100','p-2','rounded','text-xs');
+                div.innerHTML = `<b>${data.comment.user}:</b> ${data.comment.content}`;
+                commentBox.appendChild(div);
+                textarea.value = '';
+                commentBox.scrollTop = commentBox.scrollHeight;
+            }
+        });
+    });
+});
+</script>
+</body>
+</html>

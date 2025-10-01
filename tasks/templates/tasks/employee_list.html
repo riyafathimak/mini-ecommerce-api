@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee List</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+
+  <h1 class="text-2xl font-bold mb-4">Employees</h1>
+
+  <a href="{% url 'employee_add' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow mb-4 inline-block">
+    + Add Employee
+  </a>
+
+  <table class="w-full border border-gray-300 bg-white">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="border p-2">Username</th>
+        <th class="border p-2">Position</th>
+        <th class="border p-2">Department</th>
+        <th class="border p-2">Salary</th>
+        <th class="border p-2">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for emp in employees %}
+      <tr>
+        <td class="border p-2">{{ emp.user.username }}</td>
+        <td class="border p-2">{{ emp.position }}</td>
+        <td class="border p-2">{{ emp.department }}</td>
+        <td class="border p-2">{{ emp.salary }}</td>
+        <td class="border p-2 space-x-2">
+          <a href="{% url 'employee_edit' emp.id %}" class="text-blue-600 hover:underline">Edit</a>
+          <a href="{% url 'employee_delete' emp.id %}" class="text-red-600 hover:underline">Delete</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="{% url 'dashboard' %}" class="mt-4 inline-block text-blue-600 hover:underline">Back to Dashboard</a>
+
+</body>
+</html>

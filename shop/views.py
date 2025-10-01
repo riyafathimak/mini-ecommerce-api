@@ -18,6 +18,10 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework.views import APIView
 from django.db.models import Sum, F
+from .models import Order
+import csv
+import openpyxl
+from django.http import HttpResponse
 
 
 
@@ -136,3 +140,57 @@ class TotalOrderSummaryView(APIView):
             )
         )
         return Response(summary)
+    
+
+
+def export_orders_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="orders.csv"'
+
+    writer = csv.writer(response)
+    # Header
+    writer.writerow(['Order ID', 'Product ID', 'Quantity', 'Subtotal', 'Total Amount'])
+
+    orders = Order.objects.prefetch_related('items__product').all()
+
+
+def export_orders_excel(request):
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = 'Orders'
+    sheet.append(["Order ID", "Status", "Total Amount", "Created At", "Product", "Quantity", "Price", "Subtotal"])
+    for order in Order.objects.all():
+        for item in order.items.all():
+            sheet.append([
+                order.id,
+                order.status,
+                float(order.total_amount),  # convert Decimal to float
+                order.created_at.strftime("%Y-%m-%d %H:%M"),
+                item.product.name if item.product else "N/A",
+                item.quantity,
+                float(item.price),
+                float(item.quantity * item.price),
+            ])
+
+    # Response
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="orders.xlsx"'
+    workbook.save(response)
+    return response
+
+   
+    
+    for order in orders:
+        for item in order.items.all():
+            subtotal = item.quantity * item.price  # calculate dynamically
+            writer.writerow([
+                order.id,
+                item.product.id,
+                item.quantity,
+                subtotal,
+                order.total_amount
+            ])
+    
+    return response

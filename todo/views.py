@@ -23,3 +23,5 @@ class TodoDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Todo.objects.filter(user=self.request.user)
+    
+

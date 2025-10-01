@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Board</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.3/dragula.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dragula/3.7.3/dragula.min.css" />
+</head>
+<body class="bg-gray-100">
+
+  <!-- Header -->
+  <header class="bg-blue-600 text-white p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold">Task Board</h1>
+    <div class="flex gap-2">
+      <a href="{% url 'task_add' %}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded">
+        + Add Task
+      </a>
+      <a href="{% url 'employee_add' %}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded">
+        + Add Employee
+      </a>
+     
+    </div>
+  </header>
+
+  <!-- Main Task Board -->
+  <main class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <!-- To Do Column -->
+    <div class="bg-gray-200 p-4 rounded" id="todo-column">
+      <h2 class="font-bold text-lg mb-4">To Do</h2>
+      {% for task in tasks %}
+        {% if task.status == 'todo' %}
+          <div class="bg-white p-3 rounded shadow mb-2" data-id="{{ task.id }}">
+            <h3 class="font-semibold">{{ task.title }}</h3>
+            <p class="text-sm text-gray-600">{{ task.description }}</p>
+            <p class="text-xs text-gray-500">Assigned to: 
+              {% for emp in task.assigned_to.all %}
+                {{ emp.user.username }}{% if not forloop.last %}, {% endif %}
+              {% empty %}Not Assigned{% endfor %}
+            </p>
+            <a href="{% url 'task_edit' task.id %}" class="text-blue-600 text-sm">Edit</a> |
+            <a href="{% url 'task_delete' task.id %}" class="text-red-600 text-sm">Delete</a>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- In Progress Column -->
+    <div class="bg-gray-200 p-4 rounded" id="inprogress-column">
+      <h2 class="font-bold text-lg mb-4">In Progress</h2>
+      {% for task in tasks %}
+        {% if task.status == 'in_progress' %}
+          <div class="bg-white p-3 rounded shadow mb-2" data-id="{{ task.id }}">
+            <h3 class="font-semibold">{{ task.title }}</h3>
+            <p class="text-sm text-gray-600">{{ task.description }}</p>
+            <p class="text-xs text-gray-500">Assigned to: 
+              {% for emp in task.assigned_to.all %}
+                {{ emp.user.username }}{% if not forloop.last %}, {% endif %}
+              {% empty %}Not Assigned{% endfor %}
+            </p>
+            <a href="{% url 'task_edit' task.id %}" class="text-blue-600 text-sm">Edit</a> |
+            <a href="{% url 'task_delete' task.id %}" class="text-red-600 text-sm">Delete</a>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- ✅ Completed Column -->
+    <div class="bg-gray-200 p-4 rounded" id="completed-column">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-bold text-lg">Completed</h2>
+
+   
+  <!-- ✅ Email Modal -->
+  <div id="emailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div class="bg-white p-6 rounded-xl w-96 shadow-lg">
+      <h2 class="text-lg font-semibold mb-4">Send Email Notification</h2>
+
+      <form method="POST" action="{% url 'send_email' %}">
+        {% csrf_token %}
+        
+        <label class="block mb-2 text-sm font-medium">Select Employees</label>
+        <select name="employees" multiple class="w-full border p-2 rounded mb-4" required>
+          {% for employee in employees %}
+            <option value="{{ employee.id }}">{{ employee.user.username }}</option>
+          {% endfor %}
+        </select>
+
+        <label class="block mb-2 text-sm font-medium">Message</label>
+        <textarea name="message" class="w-full border p-2 rounded mb-4" rows="4" placeholder="Enter your message..."></textarea>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeEmailModal()" class="px-3 py-1 border rounded-lg">Cancel</button>
+          <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  function openEmailModal() {
+    document.getElementById('emailModal').classList.remove('hidden');
+  }
+  function closeEmailModal() {
+    document.getElementById('emailModal').classList.add('hidden');
+  }
+
+  // ✅ Drag & Drop setup
+  dragula([
+    document.getElementById("todo-column"),
+    document.getElementById("inprogress-column"),
+    document.getElementById("completed-column")
+  ]);
+  </script>
+
+</body>
+</html>
