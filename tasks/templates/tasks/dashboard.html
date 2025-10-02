@@ -240,3 +240,34 @@ document.querySelectorAll('.comment-form').forEach(form => {
 </script>
 </body>
 </html>
+# Inside your send_email view, after generating 'task_list' and 'employee_names':
+
+subject = "Task Completion Update"
+from_email = settings.EMAIL_HOST_USER
+to = recipient_list
+
+# HTML content
+html_content = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.5; color:#333;">
+    <h2 style="color:#1a73e8;">Hello Team,</h2>
+    <p>I hope you are all doing well. I am pleased to share that the following tasks have been successfully completed:</p>
+    <ul>
+      {''.join(f'<li>{task.title}</li>' for task in completed_tasks)}
+    </ul>
+    <p><strong>Special recognition goes to:</strong> {employee_names} for their outstanding contributions.</p>
+    <p>Your dedication, teamwork, and attention to detail are truly appreciated and have contributed significantly to our progress.</p>
+    <p>Let’s continue maintaining this momentum, supporting each other, and striving for excellence in all upcoming tasks.</p>
+    <p>Thank you all for your hard work and commitment — together, we are building a stronger, more successful team!</p>
+    <p>Best regards,<br>{request.user.username}</p>
+  </body>
+</html>
+"""
+
+# Optional plain text fallback
+text_content = f"Hello Team,\n\nTasks completed: {', '.join(task.title for task in completed_tasks)}\n\nSpecial recognition goes to: {employee_names}\n\nThank you,\n{request.user.username}"
+
+# Send HTML email
+email = EmailMultiAlternatives(subject, text_content, from_email, to)
+email.attach_alternative(html_content, "text/html")
+email.send()

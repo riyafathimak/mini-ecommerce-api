@@ -234,63 +234,68 @@ def send_email(request):
     if request.method == "POST":
         # Get selected employees
         employee_ids = request.POST.getlist('employees')
-        
-        print(f"Received employee IDs: {employee_ids}")
-        
-        if not employee_ids:
-            messages.error(request, "Please select at least one employee.")
-            return redirect('dashboard')
-        
         selected_employees = Employee.objects.filter(id__in=employee_ids)
         recipient_list = [emp.user.email for emp in selected_employees if emp.user.email]
-        
-        print(f"Recipient list: {recipient_list}")
-        
+
         if not recipient_list:
             messages.error(request, "No valid recipient emails found.")
             return redirect('dashboard')
-        
+
         # Prepare completed tasks text
         completed_tasks = Task.objects.filter(status='completed')
+
+
+
+        # -------------------------------
+        # <-- Insert the snippet here -->
         if completed_tasks.exists():
-            task_text = "; ".join([
-                f"{task.title} (assigned to {', '.join(emp.user.username for emp in task.assigned_to.all())})"
-                for task in completed_tasks
-            ])
+            task_list = ", ".join([task.title for task in completed_tasks])
+            employee_names = ", ".join([emp.user.username for emp in selected_employees if emp.user.username])
+            message = f"""
+Hello Team,
+
+I hope you are all doing well. I am pleased to share that the following tasks have been successfully completed: {task_list}.
+
+Special recognition goes to {employee_names} for their outstanding contributions. Your dedication, teamwork, and attention to detail are truly appreciated and have contributed significantly to our progress.
+
+These accomplishments demonstrate our team’s ability to collaborate effectively and achieve our goals together. Let’s continue maintaining this momentum, supporting each other, and striving for excellence in all upcoming tasks.
+
+Thank you all for your hard work and commitment — together, we are building a stronger, more successful team!
+
+Best regards,
+{request.user.username}
+"""
         else:
-            task_text = "No tasks have been completed yet."
-        
-        # Generate email content using Gemini - FIXED MODEL NAME
-        try:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            # Changed to the correct model name format
-            model = genai.GenerativeModel("gemini-1.5-flash-latest")
-            prompt = f"Write a professional and friendly team email summarizing the following completed tasks: {task_text}"
-            response = model.generate_content(prompt)
-            message = response.text.strip()
-            print(f"Generated message: {message[:100]}...")  # Print first 100 chars
-        except Exception as e:
-            print(f"Gemini API error: {str(e)}")
-            # Fallback to a simple message if Gemini fails
-            message = f"Hello Team,\n\nHere's an update on our completed tasks:\n\n{task_text}\n\nGreat work everyone!\n\nBest regards"
-            messages.warning(request, "Email sent with default template (Gemini unavailable)")
-        
+            message = f"""
+Hello Team,
+
+Currently, no tasks have been completed. Let's continue to work together to achieve our goals and maintain steady progress.
+
+Best regards,
+{request.user.username}
+"""
+        # -------------------------------
+
+        # Debug prints (optional)
+        print("Sending to:", recipient_list)
+        print("Email from:", settings.EMAIL_HOST_USER)
+        print("Message:", message)
+
         # Send email
         try:
-            result = send_mail(
+            send_mail(
                 subject="Task Completion Update",
                 message=message,
                 from_email=settings.EMAIL_HOST_USER,
                 recipient_list=recipient_list,
                 fail_silently=False,
             )
-            print(f"Email send result: {result}")
-            messages.success(request, f"Email sent successfully to {len(recipient_list)} recipient(s)!")
+            messages.success(request, "Email sent successfully!")
         except Exception as e:
-            print(f"Error sending email: {str(e)}")
             messages.error(request, f"Error sending email: {str(e)}")
-    
+
     return redirect('dashboard')
+
 
 # =======================
 # Board
@@ -321,3 +326,5 @@ def test_email(request):
         return HttpResponse("Test email sent!")
     except Exception as e:
         return HttpResponse(f"Error sending test email: {str(e)}")
+# Inside your send_email view, after generating 'task_list' and 'employee_names':
+
