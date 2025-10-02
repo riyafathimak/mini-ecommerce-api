@@ -11,7 +11,7 @@ urlpatterns = [
     path('todo/', include('todo.urls')),
     path('shop/', include('shop.urls')),
     path('tasks/', include('tasks.urls')),
-
+    path('tracker/', include('tracker.urls')),
     # JWT
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

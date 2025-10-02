@@ -5,14 +5,13 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, HttpResponse
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.conf import settings
 from .models import Task, Employee, Comment
 from .forms import EmployeeForm, EmployeeSignupForm
 from tasks.TaskForm import TaskForm
-import json
 from .utils import send_task_completion_email
-from django.conf import settings
-import google.generativeai as genai  # ✅ Gemini import
+import json
 
 # =======================
 # Authentication
@@ -47,6 +46,7 @@ def employee_signup(request):
         form = EmployeeSignupForm()
     return render(request, 'tasks/employee_signup.html', {'form': form})
 
+
 # =======================
 # Employee Management
 # =======================
@@ -54,6 +54,7 @@ def employee_signup(request):
 def employee_list(request):
     employees = Employee.objects.all()
     return render(request, 'tasks/employee_list.html', {'employees': employees})
+
 
 @login_required
 def employee_add(request):
@@ -65,6 +66,7 @@ def employee_add(request):
     else:
         form = EmployeeForm()
     return render(request, 'tasks/employee_form.html', {'form': form})
+
 
 @login_required
 def employee_edit(request, pk):
@@ -78,6 +80,7 @@ def employee_edit(request, pk):
         form = EmployeeForm(instance=employee)
     return render(request, 'tasks/employee_form.html', {'form': form})
 
+
 @login_required
 def employee_delete(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
@@ -86,6 +89,7 @@ def employee_delete(request, pk):
         return redirect('employee_list')
     return render(request, 'tasks/employee_confirm_delete.html', {'employee': employee})
 
+
 # =======================
 # Dashboard
 # =======================
@@ -93,7 +97,11 @@ def employee_delete(request, pk):
 def dashboard_page(request):
     tasks = Task.objects.all()
     status_filter = request.GET.get("status")
-    employee_filter = request.GET.get("employee")
+    employee_ids = request.GET.get("employees")
+    if employee_ids:
+     employee_ids_list = [int(i) for i in employee_ids.split(",") if i.isdigit()]
+     tasks = tasks.filter(assigned_to__id__in=employee_ids_list)
+
 
     if status_filter:
         tasks = tasks.filter(status=status_filter)
@@ -113,6 +121,7 @@ def dashboard_page(request):
         'employees': employees
     })
 
+
 # =======================
 # Task Management
 # =======================
@@ -127,6 +136,7 @@ def task_add(request):
         form = TaskForm()
     return render(request, 'tasks/task_form.html', {'form': form})
 
+
 @login_required
 def task_edit(request, pk):
     task = get_object_or_404(Task, pk=pk)
@@ -139,6 +149,7 @@ def task_edit(request, pk):
         form = TaskForm(instance=task)
     return render(request, 'tasks/task_form.html', {'form': form})
 
+
 @login_required
 def task_delete(request, pk):
     task = get_object_or_404(Task, pk=pk)
@@ -146,6 +157,7 @@ def task_delete(request, pk):
         task.delete()
         return redirect('dashboard')
     return render(request, 'tasks/task_confirm_delete.html', {'task': task})
+
 
 # =======================
 # Assign Task
@@ -162,6 +174,7 @@ def assign_task(request, task_id):
 
     employees = Employee.objects.all()
     return render(request, 'tasks/assign_task_modal.html', {'task': task, 'employees': employees})
+
 
 # =======================
 # AJAX: Update Status
@@ -184,6 +197,7 @@ def update_status(request, task_id):
         except Task.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Task not found'})
     return JsonResponse({'success': False, 'error': 'Invalid request'})
+
 
 # =======================
 # Add Comment (AJAX)
@@ -214,25 +228,27 @@ def add_comment(request):
 
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
+
 # =======================
-# Task List
+# Task List & Employee Dashboard
 # =======================
 def task_list(request):
     tasks = Task.objects.all()
     return render(request, 'tasks/task_list.html', {'tasks': tasks})
+
 
 @login_required
 def employee_dashboard(request):
     tasks = Task.objects.filter(assigned_to__user=request.user)
     return render(request, 'tasks/employee_dashboard.html', {'tasks': tasks})
 
+
 # =======================
-# Send Email (Gemini + Django)
+# Send Email (HTML + Dashboard link)
 # =======================
 @login_required
 def send_email(request):
     if request.method == "POST":
-        # Get selected employees
         employee_ids = request.POST.getlist('employees')
         selected_employees = Employee.objects.filter(id__in=employee_ids)
         recipient_list = [emp.user.email for emp in selected_employees if emp.user.email]
@@ -241,56 +257,71 @@ def send_email(request):
             messages.error(request, "No valid recipient emails found.")
             return redirect('dashboard')
 
-        # Prepare completed tasks text
         completed_tasks = Task.objects.filter(status='completed')
+        task_list = ", ".join([task.title for task in completed_tasks]) if completed_tasks.exists() else "No completed tasks"
+        employee_names = ", ".join([emp.user.username for emp in selected_employees if emp.user.username])
+        dashboard_url = request.build_absolute_uri(f'/tasks/dashboard/?status=completed')
 
-
-
-        # -------------------------------
-        # <-- Insert the snippet here -->
-        if completed_tasks.exists():
-            task_list = ", ".join([task.title for task in completed_tasks])
-            employee_names = ", ".join([emp.user.username for emp in selected_employees if emp.user.username])
-            message = f"""
+        # Plain text fallback
+        text_content = f"""
 Hello Team,
 
-I hope you are all doing well. I am pleased to share that the following tasks have been successfully completed: {task_list}.
+I hope you are all doing well. I’m pleased to share that we have successfully completed the following tasks: {task_list}.
 
-Special recognition goes to {employee_names} for their outstanding contributions. Your dedication, teamwork, and attention to detail are truly appreciated and have contributed significantly to our progress.
+Special recognition goes to {employee_names or "N/A"} for their exceptional contributions. Your dedication, collaboration, and attention to detail have played a key role in achieving our goals.
 
-These accomplishments demonstrate our team’s ability to collaborate effectively and achieve our goals together. Let’s continue maintaining this momentum, supporting each other, and striving for excellence in all upcoming tasks.
+You can view the dashboard here: {dashboard_url}
 
-Thank you all for your hard work and commitment — together, we are building a stronger, more successful team!
+Let’s continue this momentum, support each other, and strive for excellence in all upcoming tasks.
 
 Best regards,
 {request.user.username}
-"""
-        else:
-            message = f"""
-Hello Team,
+        """
 
-Currently, no tasks have been completed. Let's continue to work together to achieve our goals and maintain steady progress.
+        # HTML content
+        html_content = f"""
+<html>
+<body style="font-family: Arial, sans-serif; background-color:#f4f4f4; padding:20px;">
+    <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+        <div style="background:#1a73e8; color:white; padding:15px 20px; text-align:center;">
+            <h2 style="margin:0;">Task Completion Update</h2>
+        </div>
+        <div style="padding:20px; color:#333;">
+            <p>Hello Team,</p>
+            <p>I hope you are all doing well. I am pleased to share that the following tasks have been successfully completed:</p>
+            {"<ul style='margin:10px 0;'>" + "".join(f"<li>{task.title}</li>" for task in completed_tasks) + "</ul>" if completed_tasks.exists() else "<p><i>No completed tasks yet.</i></p>"}
+            <p><strong>Special recognition goes to:</strong> {employee_names or "N/A"} for their outstanding contributions.</p>
+            <p>Your dedication, teamwork, and attention to detail are truly appreciated and have contributed significantly to our progress.</p>
+            <div style="text-align:center; margin:30px 0;">
+                <a href="{dashboard_url}" 
+                   style="background:linear-gradient(90deg, #1a73e8, #4a90e2); color:white; text-decoration:none; 
+                          padding:12px 30px; border-radius:8px; font-weight:bold; font-size:14px;
+                          display:inline-block; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+                   CLICK HERE TO VIEW DASHBOARD
+                </a>
+            </div>
+            <p>Thank you all for your hard work and commitment — together, we are building a stronger, more successful team!</p>
+            <p style="margin-top:20px;">Best regards,<br>
+            <strong>{request.user.username}</strong></p>
+        </div>
+        <div style="background:#f1f1f1; text-align:center; padding:10px; font-size:12px; color:#777;">
+            <p>© 2025 Employee Task Management System</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
 
-Best regards,
-{request.user.username}
-"""
-        # -------------------------------
-
-        # Debug prints (optional)
-        print("Sending to:", recipient_list)
-        print("Email from:", settings.EMAIL_HOST_USER)
-        print("Message:", message)
-
-        # Send email
         try:
-            send_mail(
+            email = EmailMultiAlternatives(
                 subject="Task Completion Update",
-                message=message,
+                body=text_content,
                 from_email=settings.EMAIL_HOST_USER,
-                recipient_list=recipient_list,
-                fail_silently=False,
+                to=recipient_list
             )
-            messages.success(request, "Email sent successfully!")
+            email.attach_alternative(html_content, "text/html")
+            email.send()
+            messages.success(request, "HTML email with dashboard link sent successfully!")
         except Exception as e:
             messages.error(request, f"Error sending email: {str(e)}")
 
@@ -311,6 +342,7 @@ def board(request):
     }
     return render(request, 'tasks/board.html', context)
 
+
 # =======================
 # Test Email
 # =======================
@@ -326,5 +358,3 @@ def test_email(request):
         return HttpResponse("Test email sent!")
     except Exception as e:
         return HttpResponse(f"Error sending test email: {str(e)}")
-# Inside your send_email view, after generating 'task_list' and 'employee_names':
-

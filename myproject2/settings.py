@@ -45,8 +45,9 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',  
     'todo',
     'shop',
-    'tasks',
     
+    'tasks',
+    'tracker'
      
 ]
 
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
     'django.middleware.csrf.CsrfViewMiddleware',
 ]
 
@@ -192,3 +194,4 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # settings.py
 
 GEMINI_API_KEY = "AIzaSyCLDhTgKO8-00fgNKiJcKQ5OVSamlcQxdc"
+TAILWIND_APP_NAME = 'theme'
