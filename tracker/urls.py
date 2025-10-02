@@ -8,4 +8,8 @@ urlpatterns = [
     path('task/create/', views.task_create, name='task_create'),
     path('task/<int:pk>/edit/', views.task_edit, name='task_edit'),
     path('task/<int:pk>/delete/', views.task_delete, name='task_delete'),
+    path('task/<int:pk>/update-status/', views.task_update_status, name='task_update_status'),
+    path('get-notifications/', views.get_notifications, name='get_notifications'),
 ]
+
+

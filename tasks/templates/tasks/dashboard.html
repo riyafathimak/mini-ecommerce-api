@@ -1,243 +1,270 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Employee Task Management</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000 !important;
+            color: #fff !important;
+        }
+        /* Sidebar */
+        .sidebar {
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 220px;
+            background-color: #000 !important; /* Black sidebar */
+            padding-top: 60px;
+            color: #fff;
+        }
+        .sidebar a {
+            color: #fff;
+            text-decoration: none;
+            display: block;
+            padding: 12px 20px;
+        }
+        .sidebar a:hover {
+            background-color: #222 !important;
+            border-radius: 4px;
+        }
+
+        /* Main content */
+        .content {
+            margin-left: 230px;
+            padding: 20px;
+            background-color: #000 !important;
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: #000 !important;
+        }
+        .navbar .navbar-text {
+            color: #fff !important;
+        }
+
+        /* Tables */
+        table {
+            background-color: #1a1a1a !important;
+            color: #fff !important;
+        }
+        table th, table td {
+            border-color: #333 !important;
+        }
+        table tr:hover {
+            background-color: #222 !important;
+        }
+
+        /* Cards */
+        .card {
+            background-color: #1a1a1a !important;
+            color: #fff !important;
+        }
+
+        /* Notifications */
+        .notification-item {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            color: #fff;
+        }
+        .notification-item:hover {
+            background-color: #222 !important;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<!-- Header -->
-<header class="bg-blue-600 text-white p-4 flex justify-between items-center">
-  <h1 class="text-2xl font-bold">Employee Task Management</h1>
-  <div class="flex items-center space-x-4">
-    <p>Welcome, {{ request.user.username }}</p>
-    <a href="{% url 'employee_list' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow">View Employees</a>
-    <a href="{% url 'task_add' %}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow">+ Add Task</a>
-  </div>
-</header>
+<body>
 
-<!-- Filter Form -->
-<form method="get" class="mb-4 flex space-x-2 p-6">
-  <select name="status" class="border px-2">
-    <option value="" {% if request.GET.status == "" %}selected{% endif %}>All Status</option>
-    <option value="todo" {% if request.GET.status == "todo" %}selected{% endif %}>To Do</option>
-    <option value="in_progress" {% if request.GET.status == "in_progress" %}selected{% endif %}>In Progress</option>
-    <option value="completed" {% if request.GET.status == "completed" %}selected{% endif %}>Completed</option>
-  </select>
-  <input type="text" name="employee" placeholder="Search by employee" class="border px-2" value="{{ request.GET.employee|default:'' }}">
-  <button class="bg-blue-500 text-white px-3 py-1">Filter</button>
-</form>
-
-<!-- Task Board -->
-<main class="p-6 grid grid-cols-3 gap-4">
-  {% for column, column_name in status_list %}
-  <div class="bg-gray-200 rounded p-4 flex flex-col min-h-[300px]">
-    {% if column == "completed" %}
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="font-bold text-lg text-black-700">{{ column_name }}</h2>
-      <button onclick="openEmailModal()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm shadow">
-        Send Email
-      </button>
-    </div>
-    {% else %}
-    <h2 class="font-bold text-lg mb-4">{{ column_name }}</h2>
-    {% endif %}
-    
-    <div class="flex flex-col" id="{{ column }}-tasks">
-      {% for task in tasks %}
-        {% if task.status == column %}
-        <div class="bg-white p-3 rounded shadow mb-2 cursor-move task min-h-[50px]" data-id="{{ task.id }}">
-          <div class="flex justify-between items-start">
-            <h3 class="font-semibold">{{ task.title }}</h3>
-            <span class="text-xs text-gray-500">
-              {% if task.assigned_to.all %}
-                {% for emp in task.assigned_to.all %}
-                  {{ emp.user.username }}{% if not forloop.last %}, {% endif %}
-                {% endfor %}
-              {% else %}
-                Not Assigned
-              {% endif %}
-            </span>
-          </div>
-          <p class="text-sm text-gray-600 mt-1">{{ task.description }}</p>
-          <p class="text-xs mt-1">Due: {{ task.due_date|default:"Not set" }}</p>
-          <span class="px-2 py-1 text-white text-xs rounded mt-1
-            {% if task.priority == 'High' %} bg-red-500
-            {% elif task.priority == 'Medium' %} bg-yellow-500
-            {% else %} bg-green-500 {% endif %}">
-            {{ task.priority }}
-          </span>
-          
-          <!-- Comments -->
-          <div id="comments-{{ task.id }}" class="mt-2 border-t pt-1 max-h-[5rem] overflow-y-auto space-y-1">
-            {% for comment in task.comments.all %}
-            <div class="p-1 bg-gray-100 rounded text-xs">
-              <b>{{ comment.user.username }}</b>: {{ comment.content }}
-            </div>
-            {% empty %}
-            <div class="text-gray-400 text-xs">No comments yet.</div>
-            {% endfor %}
-          </div>
-          
-          <!-- Add Comment Form -->
-          <form class="comment-form mt-2" data-task-id="{{ task.id }}">
-            {% csrf_token %}
-            <textarea name="content" rows="2" placeholder="Add a comment" class="border w-full p-1"></textarea>
-            <button type="submit" class="bg-blue-500 text-white px-2 py-1 mt-1 rounded">Add Comment</button>
-          </form>
-        </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </div>
-  {% endfor %}
-</main>
-
-<!-- Improved Email Modal with Checkboxes -->
-<div id="emailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-  <div class="bg-white p-6 rounded-xl w-96 shadow-lg max-h-[80vh] overflow-y-auto">
-    <h2 class="text-lg font-semibold mb-4">Send Email Notification</h2>
-    <form method="POST" action="{% url 'send_email' %}" id="emailForm">
-      {% csrf_token %}
-      <label class="block mb-2 text-sm font-medium">Select Employees</label>
-      
-      <!-- Select All Checkbox -->
-      <div class="mb-2 pb-2 border-b">
-        <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-          <input type="checkbox" id="selectAll" class="w-4 h-4">
-          <span class="font-semibold">Select All</span>
-        </label>
-      </div>
-      
-      <!-- Individual Employee Checkboxes -->
-      <div class="space-y-1 mb-4 max-h-64 overflow-y-auto">
-        {% for employee in employees %}
-        <label class="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-          <input type="checkbox" name="employees" value="{{ employee.id }}" class="employee-checkbox w-4 h-4">
-          <span>{{ employee.user.username }} {% if employee.user.email %}({{ employee.user.email }}){% endif %}</span>
-        </label>
-        {% endfor %}
-      </div>
-      
-      <div id="emailError" class="text-red-500 text-sm mb-2 hidden">Please select at least one employee</div>
-      
-      <div class="flex justify-end gap-2">
-        <button type="button" onclick="closeEmailModal()" class="px-3 py-1 border rounded-lg hover:bg-gray-100">Cancel</button>
-        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg">Send</button>
-      </div>
-    </form>
-  </div>
+<!-- Sidebar -->
+<div class="sidebar " style="background-color: #000 !important;">
+    <h4 class="text-center mb-4">Dashboard</h4>
+    <a href="{% url 'dashboard' %}"><i class="bi bi-house"></i> Home</a>
+    <a href="{% url 'task_create' %}"><i class="bi bi-plus-square"></i> Create Task</a>
+    <a href="#tasks"><i class="bi bi-card-checklist"></i> Tasks</a>
+    <a href="#tickets"><i class="bi bi-ticket-perforated"></i> Tickets</a>
+    <a href="#emails"><i class="bi bi-envelope"></i> Emails</a>
+    <a href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Logout</a>
 </div>
 
-<!-- JS -->
+<!-- Main Content -->
+<div class="content">
+
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-expand-lg mb-4">
+        <div class="container-fluid justify-content-end">
+            <div class="position-relative me-4">
+                <i class="bi bi-bell fs-4" id="notificationBell" style="cursor:pointer;"></i>
+                <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="notifCount">0</span>
+                <div id="notifDropdown"
+                     class="dropdown-menu shadow p-2"
+                     style="display:none; position:absolute; right:0; top:30px; background:#1a1a1a; width:250px;">
+                    <div class="notification-item text-muted small">No new notifications</div>
+                </div>
+            </div>
+            <span class="navbar-text">{{ request.user.username }}</span>
+        </div>
+    </nav>
+
+    <!-- Summary Cards -->
+    <div class="container mb-4">
+        <div class="row text-center">
+            <div class="col-md-3 mb-2">
+                <div class="card p-3">
+                    <h5>Total Tasks</h5>
+                    <h3>{{ tasks.count }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="card p-3">
+                    <h5>Completed Tasks</h5>
+                    <h3>{{ tasks|length }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="card p-3">
+                    <h5>Pending Tasks</h5>
+                    <h3>{{ tasks|length }}</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-2">
+                <div class="card p-3">
+                    <h5>New Tickets</h5>
+                    <h3>{{ tickets|length }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tasks Table -->
+    <h3 id="tasks">Tasks</h3>
+    <table class="table table-striped table-bordered mb-4">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Client Email</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Assigned To</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task.id }}</td>
+                <td>{{ task.title }}</td>
+                <td>{{ task.client_email|default:"N/A" }}</td>
+                <td>{{ task.status }}</td>
+                <td>{{ task.priority }}</td>
+                <td>{{ task.assigned_to.username|default:"Unassigned" }}</td>
+                <td>{{ task.created_at|date:"d M Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'task_detail' task.id %}" class="btn btn-sm btn-info mb-1">View</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center">No tasks found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Tickets Table -->
+    <h3 id="tickets">Tickets</h3>
+    <table class="table table-striped table-bordered mb-4">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Assigned To</th>
+                <th>Category</th>
+                <th>Created At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+            <tr>
+                <td>{{ ticket.id }}</td>
+                <td>{{ ticket.title }}</td>
+                <td>{{ ticket.client.name|default:"N/A" }}</td>
+                <td>{{ ticket.status }}</td>
+                <td>{{ ticket.priority }}</td>
+                <td>{{ ticket.assigned_to.user.username|default:"Unassigned" }}</td>
+                <td>{{ ticket.category|default:"General" }}</td>
+                <td>{{ ticket.created_at|date:"d M Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center">No tickets found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Emails Table -->
+    <h3 id="emails">Emails</h3>
+    <table class="table table-striped table-bordered mb-4">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>From</th>
+                <th>Subject</th>
+                <th>Message</th>
+                <th>Received At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for email in emails %}
+            <tr>
+                <td>{{ email.id }}</td>
+                <td>{{ email.sender }}</td>
+                <td>{{ email.subject }}</td>
+                <td>{{ email.body|truncatechars:50 }}</td>
+                <td>{{ email.received_at|date:"d M Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center">No emails found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-// Drag and drop functionality
-['todo-tasks','in_progress-tasks','completed-tasks'].forEach(id => {
-    new Sortable(document.getElementById(id), {
-        group: 'tasks',
-        animation: 200,
-        ghostClass: 'opacity-50',
-        draggable: '.task',
-        onEnd: function(evt) {
-            const taskId = evt.item.dataset.id;
-            const newStatus = evt.to.id.replace('-tasks','');
-            fetch(`/tasks/update_status/${taskId}/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({status: newStatus})
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(!data.success){
-                    alert('Failed to update status');
-                    evt.from.appendChild(evt.item);
-                }
+document.getElementById("notificationBell").addEventListener("click", () => {
+    const dropdown = document.getElementById("notifDropdown");
+    dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
+});
+
+setInterval(() => {
+    fetch('/get-notifications/')
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("notifCount").textContent = data.unread_count;
+        const dropdown = document.getElementById("notifDropdown");
+        dropdown.innerHTML = "";
+        if (data.messages.length === 0) {
+            dropdown.innerHTML = "<div class='notification-item text-muted small'>No new notifications</div>";
+        } else {
+            data.messages.forEach(msg => {
+                const item = document.createElement('div');
+                item.className = 'notification-item';
+                item.textContent = msg;
+                dropdown.appendChild(item);
             });
         }
     });
-});
-
-// Email modal functions
-function openEmailModal() {
-  document.getElementById('emailModal').classList.remove('hidden');
-  document.getElementById('emailError').classList.add('hidden');
-}
-
-function closeEmailModal() {
-  document.getElementById('emailModal').classList.add('hidden');
-  document.getElementById('emailForm').reset();
-}
-
-// Select all functionality
-document.getElementById('selectAll').addEventListener('change', function() {
-  const checkboxes = document.querySelectorAll('.employee-checkbox');
-  checkboxes.forEach(cb => cb.checked = this.checked);
-});
-
-// Update "Select All" if individual boxes change
-document.querySelectorAll('.employee-checkbox').forEach(cb => {
-  cb.addEventListener('change', function() {
-    const allCheckboxes = document.querySelectorAll('.employee-checkbox');
-    const allChecked = Array.from(allCheckboxes).every(c => c.checked);
-    document.getElementById('selectAll').checked = allChecked;
-  });
-});
-
-// Form validation
-document.getElementById('emailForm').addEventListener('submit', function(e) {
-  const checkedBoxes = document.querySelectorAll('.employee-checkbox:checked');
-  if (checkedBoxes.length === 0) {
-    e.preventDefault();
-    document.getElementById('emailError').classList.remove('hidden');
-    return false;
-  }
-});
-
-// Add comment via AJAX
-document.querySelectorAll('.comment-form').forEach(form => {
-    form.addEventListener('submit', function(e){
-        e.preventDefault();
-        const taskId = this.dataset.taskId;
-        const textarea = this.querySelector('textarea');
-        const content = textarea.value.trim();
-        const csrfToken = this.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        if(!content) return alert('Comment cannot be empty');
-        
-        fetch("{% url 'add_comment' %}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': csrfToken
-            },
-            body: new URLSearchParams({
-                'task_id': taskId,
-                'content': content
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.error){
-                alert(data.error);
-            } else {
-                const commentBox = document.getElementById(`comments-${taskId}`);
-                const div = document.createElement('div');
-                div.classList.add('bg-gray-100','p-2','rounded','text-xs');
-                div.innerHTML = `<b>${data.comment.user}:</b> ${data.comment.content}`;
-                commentBox.appendChild(div);
-                textarea.value = '';
-                commentBox.scrollTop = commentBox.scrollHeight;
-            }
-        });
-    });
-});
+}, 5000);
 </script>
+
 </body>
 </html>
-

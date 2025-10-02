@@ -32,7 +32,7 @@
         <td class="border p-2">{{ emp.department }}</td>
         <td class="border p-2">{{ emp.salary }}</td>
         <td class="border p-2 space-x-2">
-          <a href="{% url 'employee_edit' emp.id %}" class="text-blue-600 hover:underline">Edit</a>
+          <a href="{% url 'employee_edit' emp.id %}" class="text-black-600 hover:underline">Edit</a>
           <a href="{% url 'employee_delete' emp.id %}" class="text-red-600 hover:underline">Delete</a>
         </td>
       </tr>
@@ -40,7 +40,7 @@
     </tbody>
   </table>
 
-  <a href="{% url 'dashboard' %}" class="mt-4 inline-block text-blue-600 hover:underline">Back to Dashboard</a>
+  <a href="{% url 'dashboard' %}" class="mt-4 inline-block text-black-600 hover:underline">Back to Dashboard</a>
 
 </body>
 </html>

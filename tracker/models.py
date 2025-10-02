@@ -11,6 +11,7 @@ class Employee(models.Model):
     def __str__(self):
         return self.user.username
 
+
 # -------------------
 # Client / Requester
 # -------------------
@@ -23,6 +24,7 @@ class Client(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.company})" if self.company else self.name
+
 
 # -------------------
 # Status & Priority Choices (global)
@@ -40,23 +42,54 @@ PRIORITY_CHOICES = [
     ('Low', 'Low'),
 ]
 
+
+# -------------------
+# Email Model (for fetching emails)
+# -------------------
+class Email(models.Model):
+    sender = models.EmailField()
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    received_at = models.DateTimeField(auto_now_add=True)
+    message_id = models.CharField(max_length=200, unique=True, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.subject} from {self.sender}"
+
+
+# -------------------
+# Message Model (from clients)
+# -------------------
+class Message(models.Model):
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.subject
+
+
 # -------------------
 # Task Model
 # -------------------
 class Task(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.SET_NULL, null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField()
-    assigned_to = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL)
+    client_email = models.EmailField(blank=True, null=True)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Medium')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Medium')
+    due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
 
+
 # -------------------
-# Ticket Model (linked to Client & Employee)
+# Ticket Model
 # -------------------
 class Ticket(models.Model):
     title = models.CharField(max_length=200)
@@ -65,14 +98,25 @@ class Ticket(models.Model):
     assigned_to = models.ForeignKey(Employee, null=True, blank=True, on_delete=models.SET_NULL)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='Medium')
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ('Backend', 'Backend'),
+            ('Frontend', 'Frontend'),
+            ('App Development', 'App Development'),
+            ('Meetings', 'Meetings'),
+        ],
+        default='General'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
 
+
 # -------------------
-# Comments for tasks
+# Comment Model
 # -------------------
 class Comment(models.Model):
     task = models.ForeignKey(Task, related_name='comments', on_delete=models.CASCADE)
@@ -82,3 +126,13 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.author} on {self.task}"
+
+
+# -------------------
+# Notification Model
+# -------------------
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_notifications')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
